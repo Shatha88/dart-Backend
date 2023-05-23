@@ -2,30 +2,34 @@
 
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:shelf/shelf.dart';
-import 'package:supabase/supabase.dart';
 
-import '../ResponseMsg/CustomResponse.dart';
+import '../../Services/Supabase/supabaseEnv.dart';
 
 Middleware checkTokenMiddleware() => (innerhandler) => (Request req) {
       try {
-        return CustomResponse().successResponse(
-          msg: "",
-          statusCode: 201,
-          data: [],
+        if (!req.headers.containsKey("authorization")) {
+          return Response.forbidden("you need access for this endPoint");
+        }
+        final token = req.headers['authorization'].toString().trim();
+        // Verify a token
+        JWT.verify(
+          token,
+          SecretKey(
+            SupabaseEnv().getJWT,
+          ),
         );
-      } on AuthException catch (error) {
-        return CustomResponse()
-            .errorResponse(msg: error.message, statusCode: error.statusCode);
+
+        return innerhandler(req);
       } on JWTExpiredError {
         print('jwt expired');
 
-        return Response.forbidden("expired is Expired");
-      } on JWTError catch (error) {
-        print(error.message);
+        return Response.forbidden("Refresh token");
+      } on JWTError catch (ex) {
+        print(ex.message);
 
         return Response.forbidden("token not right");
-        // error: invalid token
-      } on Exception {
+        // ex: invalid signature
+      } catch (error) {
         return Response.forbidden("you need access for this endPoint");
       }
     };
